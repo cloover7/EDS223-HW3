@@ -1,0 +1,29 @@
+---
+title: Homework 3 - Aquaculture Analysis
+author: Erin Yang
+format: pdf
+execute: 
+  warning: false
+---
+
+# Load Data
+
+```{r}
+library(tidyverse)
+library(sf)
+library(here)
+library(tmap)
+library(terra)
+
+sst  <- c(rast(
+    'data/average_annual_sst_2008.tif',
+    'data/average_annual_sst_2009.tif',
+    'data/average_annual_sst_2010.tif',
+    'data/average_annual_sst_2011.tif',
+    'data/average_annual_sst_2012.tif'
+))
+
+depth  <- rast("data/depth.tif")
+
+eez <- st_read(here('data', 'wc_regions_clean.shp'))
+```
