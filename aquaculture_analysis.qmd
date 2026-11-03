@@ -15,13 +15,13 @@ library(here)
 library(tmap)
 library(terra)
 
-sst  <- c(rast(
-    'data/average_annual_sst_2008.tif',
-    'data/average_annual_sst_2009.tif',
-    'data/average_annual_sst_2010.tif',
-    'data/average_annual_sst_2011.tif',
-    'data/average_annual_sst_2012.tif'
-))
+sst  <- c(
+    rast('data/average_annual_sst_2008.tif'),
+    rast('data/average_annual_sst_2009.tif'),
+    rast('data/average_annual_sst_2010.tif'),
+    rast('data/average_annual_sst_2011.tif'),
+    rast('data/average_annual_sst_2012.tif')
+)
 
 depth  <- rast("data/depth.tif")
 
