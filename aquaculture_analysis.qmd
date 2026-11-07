@@ -6,7 +6,7 @@ execute:
   warning: false
 ---
 
-# Load Data
+## Load Data
 
 ```{r}
 library(tidyverse)
@@ -27,3 +27,41 @@ depth  <- rast("data/depth.tif")
 
 eez <- st_read(here('data', 'wc_regions_clean.shp'))
 ```
+
+## Data processing and cleaning
+
+```{r}
+# check crs are the same
+if(st_crs(sst) != st_crs(depth)) warning("crs are not the same! fix!")
+if(st_crs(sst) != st_crs(eez)) warning("crs are not the same! fix!")
+
+```
+
+
+```{r}
+# mean SST between 2008-2012
+avg_sst <- mean(sst, na.rm = TRUE)
+avg_sst <- avg_sst - 273.15
+```
+
+
+```{r}
+# crop depth raster to match extent of sst
+#| results: hold
+
+depth_resampled <- resample(depth, avg_sst, method = "bilinear")
+
+cat("After resampling:\n")
+cat("Resolutions match:", all(res(avg_sst) == res(depth_resampled)), "\n")
+cat("Origins match: ", all(round(origin(avg_sst), 8) ==
+                               round(origin(depth_resampled), 8)), "\n")
+cat("Extents match: ", ext(avg_sst) == ext(depth_resampled), "\n")
+```
+
+```{r}
+# try stacking
+depth_resampled <- project(depth_resampled, avg_sst) # ensure crs are actually the same
+
+stack <- c(avg_sst, depth_resampled) # stack
+```
+
