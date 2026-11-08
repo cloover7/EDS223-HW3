@@ -6,6 +6,10 @@ execute:
   warning: false
 ---
 
+# West Coast Aquaculture Analysis
+
+In this project, we create a function that creates a map of suitable aquaculture area in Exclusive Economic Zones (EEZ) on the West Coast. The function takes in a specific species and its temperature and depth ranges and then ranks EEZ based on total suitable area (km^2) within each zone.
+
 ## Load Data
 
 ```{r}
@@ -28,7 +32,9 @@ depth  <- rast("data/depth.tif")
 eez <- st_read(here('data', 'wc_regions_clean.shp'))
 ```
 
-## Data processing and cleaning
+## Data Processing and Cleaning
+
+Before making the function, we first prepare sea surface temperature and depth raster data for mapping. The function runs assuming this data processing has already happened.
 
 ```{r}
 # check crs are the same
@@ -46,7 +52,7 @@ avg_sst <- avg_sst - 273.15
 
 
 ```{r}
-# crop depth raster to match extent of sst
+# resample depth raster to match extent of sst
 #| results: hold
 
 depth_resampled <- resample(depth, avg_sst, method = "bilinear")
@@ -62,6 +68,133 @@ cat("Extents match: ", ext(avg_sst) == ext(depth_resampled), "\n")
 # try stacking
 depth_resampled <- project(depth_resampled, avg_sst) # ensure crs are actually the same
 
-stack <- c(avg_sst, depth_resampled) # stack
+stack <- c(avg_sst, depth_resampled) # stack to check crs, resolution, extent are the same
 ```
 
+## Find Suitable Locations
+
+We first want to run our analysis on oysters before generalizing the workflow to be applicable to any marine species. We find suitable cells on the map by selecting only cells that are suitable in both temperature and depth. 
+
+```{r}
+# variables for min temp, max temp, min depth, max depth
+oyster_temp_min <- 11
+oyster_temp_max <- 30
+oyster_depth_min <- -70
+oyster_depth_max <- 0
+
+# reclassify sst
+mat <- matrix(c(oyster_temp_min, oyster_temp_max, 1,
+-Inf, oyster_temp_min, 0,
+oyster_temp_max, Inf, 0),
+ncol=3, byrow=TRUE
+)
+
+avg_sst_class <- classify(avg_sst, mat)
+
+# reclassify depth
+
+d_mat <- matrix(c(oyster_depth_min, oyster_depth_max, 1,
+-Inf, oyster_depth_min, 0,
+oyster_depth_max, Inf, 0),
+ncol = 3, byrow = TRUE)
+
+depth_class <- classify(depth_resampled, d_mat)
+
+# reclassify to identify sst and depth suitable raster
+suitable <- lapp(c(avg_sst_class, depth_class), fun = function(s, d) s * d)
+names(suitable) <- "oyster suitability"
+
+```
+
+## Determine Most Suitable EEZ
+
+Total suitable area is determined by calculating area (km^2) per cell, and then multiplying that by each cell denoted '1', or suitable, in the previous code chunk. Total suitable area per zone is then calculated by summing the suitable areas in a zonal function.
+
+
+```{r}
+# suitable cells are those denoted '1'
+# rasterize eez
+eez_rast <- as.factor(rasterize(eez, suitable, field = 'rgn_id'))
+
+# calculate cell area
+area <- cellSize(eez_rast, unit = 'km')
+
+# calculate total suitable area per zone
+suitable_area <- lapp(c(area, suitable), fun = function(a, s) a * s) # make mini multiply function
+eez_suitable_area <- zonal(suitable_area, eez_rast, fun = 'sum', na.rm = TRUE, as.raster = TRUE)
+names(eez_suitable_area) <- 'Suitable Area (km^2)'
+
+```
+
+Now the data is ready to be mapped!
+
+```{r}
+# map
+tm_shape(eez_suitable_area) +
+  tm_raster() +
+  tm_basemap('OpenStreetMap') +
+  tm_title('Oyster Aquaculture Zones Ranked by Suitability') +
+  tm_scalebar(position = c("left", "bottom")) +
+  tm_compass(position = c("left", "top"))
+```
+
+It seems that the coast of Central California has the greatest area of suitable ocean for oyster aquaculture, at about 5,000 km^2. Next are Southern California and Washington, at about 3,000 km^2. And last are Oregon and Northern California, which have <2,000 km^2 of suitable area. These zones are not recommended for oyster aquaculture.
+
+## Making it a Function
+
+The function is made using the code previously used to analyze oyster aquaculture suitability. It takes in a species name, minimum temperature, maximum temperature, minimum depth, and maximum depth. It then outputs a custom map with suitable area in West Coast aquaculture zones for the specified species.
+
+```{r}
+map_suitable_eez <- function(tmin = 11, tmax = 30, dmin = -70, dmax = 0, species = 'Oyster'){
+  # reclassify sst
+  mat <- matrix(c(tmin, tmax, 1,
+  -Inf, tmin, 0,
+  tmax, Inf, 0),
+  ncol=3, byrow=TRUE
+  )
+
+  avg_sst_class <- classify(avg_sst, mat)
+
+  # reclassify depth
+
+  d_mat <- matrix(c(dmin, dmax, 1,
+  -Inf, dmin, 0,
+  dmax, Inf, 0),
+  ncol = 3, byrow = TRUE)
+
+  depth_class <- classify(depth_resampled, d_mat)
+
+  # make sure reclassified sst and depth are the same crs
+  if(st_crs(avg_sst_class) != st_crs(depth_class)) stop("crs are not the same! fix!")
+
+  # reclassify to identify sst and depth suitable raster
+  suitable <- lapp(c(avg_sst_class, depth_class), fun = function(s, d) s * d)
+
+  # rasterize eez
+  eez_rast <- as.factor(rasterize(eez, suitable, field = 'rgn_id'))
+
+  # calculate cell area
+  area <- cellSize(eez_rast, unit = 'km')
+
+  # calculate total suitable area per zone
+  suitable_area <- lapp(c(area, suitable), fun = function(a, s) a * s) # make mini multiply function
+  eez_suitable_area <- zonal(suitable_area, eez_rast, fun = 'sum', na.rm = TRUE, as.raster = TRUE)
+  names(eez_suitable_area) <- 'Suitable Area (km^2)'
+
+  # map
+  tm_shape(eez_suitable_area) +
+    tm_raster() +
+    tm_basemap('OpenStreetMap') +
+    tm_title(paste0(species, ' Aquaculture Zones Ranked by Suitability')) +
+    tm_scalebar(position = c("left", "bottom")) +
+    tm_compass(position = c("left", "top"))
+}
+```
+
+Let's try our function on a popular seafood item, Dungeness Crab!
+
+```{r}
+map_suitable_eez(3, 19, -360, 0, 'Dungeness Crab')
+```
+
+The most suitable area for Dungeness Crab is Oregon with about 20,000 km^2 of suitable area. Next is Washington, which also has considerable suitable area. California has less suitable area, around 8,000 to 15,000 km^2. 
