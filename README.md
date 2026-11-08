@@ -1,6 +1,8 @@
 # EDS223-HW3
 Repository for EDS 223 Homework 3: Prioritizing potential aquaculture. In this project, we create a function that takes in aquatic species' preferred temperature and depth and maps suitable areas for aquaculture of these species.
 
+[Source: Getty Images](https://www.foodnavigator.com/resizer/v2/PA4T3FSRPBK5FI3M54JKR7AW3I.jpg?auth=0ecfcf560491456730eb57250f8ad071c0e980e6297c61af840ee0cb80591243&width=824&height=465&smart=true)
+
 ## Repository Structure
 
 EDS223-HW3
@@ -24,6 +26,8 @@ The [data](https://drive.google.com/file/d/1u-iwnPDbe6ZK7wSFVMI-PpCKaRQ3RVmg/vie
 # Authors
 
 Erin Yang
+
+Annie Adams
 
 # References and / or Acknowledgements
 
